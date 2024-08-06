@@ -11,66 +11,86 @@ This idea seems good and easy to take, but really need effects to solve some pro
 
 demo will be given as a simified one,we change the front complier from MSVC(cl.exe) into LLVM(clang.exe or clang-cl.exe) no matter the cl.exe invoked by make, cmake or other building tools.
 
-# How to 
+# How to (in a wrong way)
 To achieve the goal of caching all command lines in PowerShell, allowing a Python script to decide whether to change the command and parameters, and then returning the command to PowerShell for execution, you can follow these steps:
 
 1. **Set up a PowerShell profile script to intercept and cache commands.**
 2. **Create a Python script to decide whether to modify the commands.**
 3. **Ensure the PowerShell profile script sends commands to the Python script and executes the returned commands.**
 
-### Step 1: Create a PowerShell Profile Script
+powershell only print all this output in command line, not for sequence command lines.
 
-1. **Locate or create your PowerShell profile script:**
-   ```powershell
-   $profile
-   ```
+using miniFilter try again.
 
-   This command will show the path to your PowerShell profile script. If the file does not exist, you can create it by running:
-   ```powershell
-   New-Item -Path $profile -ItemType File -Force
-   ```
-    or copy the ps1 file into your path. Remeber to back up your original file.
+Using Windows Process Monitor (ProcMon) to check command lines with their parameters can be a bit tricky, as ProcMon is primarily designed for monitoring file system, registry, and process/thread activity. However, you can still use it to capture command line arguments by following these steps:
 
-2. **Edit the profile script to intercept and cache commands:**
-   Add the following code to your PowerShell profile script:
+### Using Process Monitor (ProcMon)
 
-   ```powershell
-       # chage the path to your intercept.py Python script
-       $pythonScriptPath = "C:/path/to/your/intercept.py"
-   ```
+1. **Download and Run ProcMon**:
+   - Download Process Monitor from the [Microsoft Sysinternals website](https://docs.microsoft.com/en-us/sysinternals/downloads/procmon).
+   - Extract the downloaded file and run `Procmon.exe`.
 
-   This script defines a custom `Prompt` function that intercepts commands entered by the user, sends them to a Python script for modification, and then executes the modified command.
+2. **Configure Filters**:
+   - When ProcMon starts, it will begin capturing all events. This can be overwhelming, so you need to set up filters.
+   - Click on the `Filter` menu and select `Filter...` or press `Ctrl+L`.
+   - Add a filter to capture only process creation events:
+     - In the filter dialog, set the first drop-down to `Operation`.
+     - Set the second drop-down to `is`.
+     - Set the third drop-down to `Process Create`.
+     - Click `Add`, then `OK`.
 
-### Step 2: Create the Python Script
+3. **Start Capturing**:
+   - Click the `Capture` button (or press `Ctrl+E`) to start capturing events if it’s not already running.
 
-1. **Create a Python script to decide whether to modify the commands:**
-   Save the following code to a file, for example, `intercept.py`:
+4. **Run Your Command**:
+   - Execute the command or script you want to monitor.
 
-   This script reads the original command from the command line arguments, decides whether to modify it, and prints the modified command.
+5. **Stop Capturing**:
+   - Once the command has run, click the `Capture` button again to stop capturing events.
 
-### Step 3: Test the Setup
+6. **Find the Event**:
+   - Look through the captured events for the `Process Create` event related to your command.
+   - Click on the event to view its details. The command line and parameters should be visible in the event properties.
 
-1. **Open a new PowerShell session:**
-   The changes to the profile script will take effect in the new session.
+### Using Windows Event Viewer
 
-2. **Enter a command:**
-   ```powershell
-   Get-Process
-   ```
+If ProcMon does not provide the necessary details, you can use Windows Event Viewer to capture command line arguments for process creation events.
 
-   The command should be intercepted, sent to the Python script for potential modification, and then executed as either the original or modified command.
+1. **Enable Command Line Auditing**:
+   - Open the `Local Group Policy Editor` by typing `gpedit.msc` in the Run dialog (`Win + R`).
+   - Navigate to `Computer Configuration -> Windows Settings -> Security Settings -> Advanced Audit Policy Configuration -> System Audit Policies - Local Group Policy Object -> Detailed Tracking`.
+   - Enable `Audit Process Creation` and `Audit Process Termination`.
 
-### Explanation
+2. **Check Event Viewer**:
+   - Open `Event Viewer` by typing `eventvwr.msc` in the Run dialog (`Win + R`).
+   - Navigate to `Windows Logs -> Security`.
+   - Look for events with `Event ID 4688` (A new process has been created).
+   - The event details will include the command line and parameters.
 
-- **PowerShell Profile Script:**
-  - The `Prompt` function is overridden to intercept user commands.
-  - The `Invoke-CommandWithModification` function sends the command to the Python script and executes the returned command.
+### Using PowerShell
 
-- **Python Script:**
-  - The script reads the original command, decides whether to modify it, and prints the modified command.
+You can also use PowerShell to monitor process creation and capture command line arguments.
 
-### Customization
+1. **Run PowerShell Script**:
+   - Open PowerShell with administrative privileges.
+   - Use the following script to monitor process creation:
 
-You can customize the `modify_command` function in the Python script to apply any modifications you need. The PowerShell profile script can also be extended to handle more complex scenarios, such as logging commands or handling errors.
+```powershell
+$Query = @"
+    <QueryList>
+        <Query Id="0" Path="Security">
+            <Select Path="Security">*[System[(EventID=4688)]]</Select>
+        </Query>
+    </QueryList>
+"@
 
-This setup allows you to intercept, cache, modify, and execute PowerShell commands using a Python script, providing a flexible way to automate and manipulate PowerShell workflows.
+Register-WmiEvent -Query $Query -SourceIdentifier "ProcessCreationMonitor" -Action {
+    $event = $Event.SourceEventArgs.NewEvent
+    $commandLine = $event.InsertionStrings[8]
+    Write-Output "Process Created: $commandLine"
+}
+```
+
+This script will monitor for process creation events and output the command line arguments to the console.
+
+By using these methods, you can effectively monitor and capture command line arguments and parameters for processes on a Windows system.
