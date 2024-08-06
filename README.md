@@ -20,9 +20,6 @@ To achieve the goal of caching all command lines in PowerShell, allowing a Pytho
 
 powershell only print all this output in command line, not for sequence command lines.
 
-<<<<<<< HEAD
-using miniFilter try again.
-
 Using Windows Process Monitor (ProcMon) to check command lines with their parameters can be a bit tricky, as ProcMon is primarily designed for monitoring file system, registry, and process/thread activity. However, you can still use it to capture command line arguments by following these steps:
 
 ### Using Process Monitor (ProcMon)
@@ -95,6 +92,5 @@ Register-WmiEvent -Query $Query -SourceIdentifier "ProcessCreationMonitor" -Acti
 This script will monitor for process creation events and output the command line arguments to the console.
 
 By using these methods, you can effectively monitor and capture command line arguments and parameters for processes on a Windows system.
-=======
+
 using miniFilter try again.
->>>>>>> 02842510b030b163e5163f93f106d0ea51ac61be
